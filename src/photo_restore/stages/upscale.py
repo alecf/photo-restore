@@ -33,7 +33,11 @@ def upscale(
         raise RuntimeError(_MISSING_ML) from err
 
     model = _load_model(weight_name, device)
-    tensor = torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0).float().div(255.0).to(device)
+    # ascontiguousarray gives torch a writable buffer (PIL arrays are read-only).
+    contiguous = np.ascontiguousarray(array)
+    tensor = (
+        torch.from_numpy(contiguous).permute(2, 0, 1).unsqueeze(0).float().div(255.0).to(device)
+    )
 
     try:
         with torch.no_grad():

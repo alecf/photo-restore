@@ -108,7 +108,7 @@ photo-restore/
   tests/                    # pure logic gets real assertions; ML gets smoke tests
 ```
 
-Heavy ML libraries (`torch`, `spandrel`, `gfpgan`) are **lazy-imported** inside
+Heavy ML libraries (`torch`, `spandrel`, `facexlib`) are **lazy-imported** inside
 the stages so the CLI, resolution math, and tests run without them installed.
 They live in the `ml` optional-dependency extra.
 
@@ -130,12 +130,17 @@ They live in the `ml` optional-dependency extra.
   output shape, aspect preserved, grayscale stays grayscale. No pixel-quality
   assertions.
 
-## Known pitfall
+## Model-loading decision
 
-`gfpgan`/`basicsr` historically import `torchvision.transforms.functional_tensor`,
-removed in torchvision ≥ 0.17. The `ml` extra pins a compatible torchvision (or
-applies the documented shim). Captured here so it doesn't surprise the next
-contributor.
+The `gfpgan` and `realesrgan` pip packages both depend on `basicsr`, which does
+not build on Python ≥ 3.12 (its `setup.py` fails) and imports
+`torchvision.transforms.functional_tensor`, removed in torchvision ≥ 0.17. We
+therefore depend on **neither**. `spandrel` runs every network (upscaler and
+face nets) from their original `.pth` weights, and `facexlib` provides face
+detection / alignment / paste-back without `basicsr`. This keeps the stack
+buildable on current Python and torchvision and matches the "spandrel for
+everything" principle, at the cost of orchestrating face crop → net → paste
+ourselves (a few lines in `stages/faces.py`).
 
 ## Out of scope for v1
 

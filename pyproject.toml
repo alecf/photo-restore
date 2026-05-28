@@ -28,16 +28,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Everything needed to actually run the restoration models.
-# torchvision is pinned <0.17 because gfpgan/basicsr import the removed
-# `torchvision.transforms.functional_tensor` module (see README known issues).
+# Everything needed to actually run the restoration models. We deliberately do
+# NOT depend on the `gfpgan`/`realesrgan` packages: both drag in `basicsr`, which
+# fails to build on modern Python (3.12+). Instead spandrel runs every network
+# (the upscaler and the face-restoration nets alike) and facexlib handles face
+# detection / alignment / paste-back — the same pieces gfpgan uses internally,
+# minus the unbuildable dependency.
 ml = [
     "torch>=2.2",
-    "torchvision>=0.16,<0.17",
+    "torchvision>=0.17",
     "spandrel>=0.4",
-    "gfpgan>=1.3.8",
-    "realesrgan>=0.3",
     "facexlib>=0.3",
+    "opencv-python>=4.9",
 ]
 dev = [
     "pytest>=8",

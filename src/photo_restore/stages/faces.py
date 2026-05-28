@@ -1,23 +1,27 @@
-"""Face restoration via GFPGAN (conservative) or CodeFormer (balanced).
+"""Face restoration via spandrel + facexlib.
 
-Both detect faces, restore each crop, and paste it back. If no faces are found
-the input is returned unchanged. Identity preservation is the priority, so the
-default is GFPGAN v1.4 and CodeFormer is run at a high fidelity weight.
+facexlib detects, aligns, and pastes faces back; spandrel runs the restoration
+network (GFPGAN v1.4 by default, CodeFormer for `--strength balanced`). This
+avoids the `gfpgan`/`basicsr` packages, which don't build on modern Python.
 
-Heavy ML libraries are imported lazily inside `restore` so the rest of the tool
-loads without them.
+If no faces are found the input is returned unchanged. Identity preservation is
+the priority, so the default is GFPGAN v1.4.
+
+Heavy ML libraries are imported lazily inside `restore`.
 """
 
 from __future__ import annotations
+
+from functools import lru_cache
 
 import numpy as np
 
 from photo_restore import models
 
-# strength -> (weight name, GFPGANer arch, codeformer fidelity weight)
+# strength -> weight registry name
 _STRENGTH = {
-    "conservative": ("gfpgan-v1.4", "clean", 0.5),
-    "balanced": ("codeformer", "CodeFormer", 0.75),
+    "conservative": "gfpgan-v1.4",
+    "balanced": "codeformer",
 }
 
 _MISSING_ML = (
@@ -31,40 +35,76 @@ def restore(
 ) -> np.ndarray:
     """Restore faces in an RGB uint8 array. Returns RGB uint8 of the same size.
 
-    `strength` selects the model: 'conservative' (GFPGAN v1.4, identity-faithful)
-    or 'balanced' (CodeFormer at fidelity weight 0.75 — sharper, recovers more
-    from heavy degradation, slightly higher risk of subtle facial change).
+    `strength` selects the network: 'conservative' (GFPGAN v1.4, identity-faithful)
+    or 'balanced' (CodeFormer — sharper, recovers more from heavy degradation,
+    slightly higher risk of subtle facial change).
     """
     if strength not in _STRENGTH:
         raise ValueError(f"unknown strength {strength!r}; choose from {sorted(_STRENGTH)}")
 
     try:
         import cv2
-        from gfpgan import GFPGANer
+        import torch
+        from facexlib.utils.face_restoration_helper import FaceRestoreHelper
     except ImportError as err:  # pragma: no cover - exercised only without the ml extra
         raise RuntimeError(_MISSING_ML) from err
 
-    weight_name, arch, fidelity = _STRENGTH[strength]
-    model_path = str(models.ensure_weight(weight_name))
+    model = _load_model(_STRENGTH[strength], device)
 
-    restorer = GFPGANer(
-        model_path=model_path,
-        upscale=1,  # we control scaling separately in the upscale stage
-        arch=arch,
-        channel_multiplier=2,
-        bg_upsampler=None,
+    helper = FaceRestoreHelper(
+        upscale_factor=1,
+        face_size=512,
+        crop_ratio=(1, 1),
+        det_model="retinaface_resnet50",
+        save_ext="png",
+        use_parse=True,
         device=device,
     )
+    helper.clean_all()
+    helper.read_image(cv2.cvtColor(array, cv2.COLOR_RGB2BGR))
+    num_faces = helper.get_face_landmarks_5(only_center_face=False, eye_dist_threshold=5)
+    if num_faces == 0:
+        return array  # nothing to restore; leave the image untouched
 
-    bgr = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
-    _, _, restored_bgr = restorer.enhance(
-        bgr,
-        has_aligned=False,
-        only_center_face=False,
-        paste_back=True,
-        weight=fidelity,
-    )
-    if restored_bgr is None:
-        return array  # no faces detected / nothing to paste back
-    rgb: np.ndarray = cv2.cvtColor(restored_bgr, cv2.COLOR_BGR2RGB)
-    return rgb
+    helper.align_warp_face()
+    for cropped_bgr in helper.cropped_faces:
+        face_rgb = cv2.cvtColor(cropped_bgr, cv2.COLOR_BGR2RGB)
+        tensor = (
+            torch.from_numpy(np.ascontiguousarray(face_rgb))
+            .permute(2, 0, 1)
+            .unsqueeze(0)
+            .float()
+            .div(255.0)
+            .to(device)
+        )
+        with torch.no_grad():
+            out = model(tensor)
+        restored_rgb = (
+            out.clamp(0.0, 1.0)
+            .mul(255.0)
+            .round()
+            .squeeze(0)
+            .permute(1, 2, 0)
+            .to("cpu", torch.uint8)
+        ).numpy()
+        helper.add_restored_face(cv2.cvtColor(restored_rgb, cv2.COLOR_RGB2BGR))
+
+    helper.get_inverse_affine(None)
+    pasted_bgr = helper.paste_faces_to_input_image()
+    result: np.ndarray = cv2.cvtColor(pasted_bgr, cv2.COLOR_BGR2RGB)
+    return result
+
+
+@lru_cache(maxsize=2)
+def _load_model(weight_name: str, device: str):  # type: ignore[no-untyped-def]
+    try:
+        import torch
+        from spandrel import ImageModelDescriptor, ModelLoader
+    except ImportError as err:  # pragma: no cover
+        raise RuntimeError(_MISSING_ML) from err
+
+    path = models.ensure_weight(weight_name)
+    descriptor = ModelLoader().load_from_file(str(path))
+    if not isinstance(descriptor, ImageModelDescriptor):
+        raise RuntimeError(f"{weight_name} is not a usable image model")
+    return descriptor.to(torch.device(device)).eval()

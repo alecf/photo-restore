@@ -124,14 +124,21 @@ The resolution math, CLI dispatch, grayscale handling, and contrast pass have
 real unit tests and run without the ML stack. The ML stages lazy-import torch,
 so the test suite and a contrast-only/resize-only run work in a base install.
 
-## Known issues
+## How the models are loaded
 
-`gfpgan`/`basicsr` historically import `torchvision.transforms.functional_tensor`,
-which was removed in torchvision ≥ 0.17. The `ml` extra pins
-`torchvision>=0.16,<0.17` to avoid the breakage. If you bump torchvision and see
-an import error from `basicsr`, that's the cause — either keep the pin or apply
-the one-line shim that re-exports `functional_tensor` from
-`torchvision.transforms.functional`.
+The popular `gfpgan` and `realesrgan` pip packages both depend on `basicsr`,
+which does not build on modern Python (3.12+) and imports a torchvision module
+that was removed in torchvision ≥ 0.17. Rather than fight that, this tool does
+not depend on any of them. Instead:
+
+- **`spandrel`** loads and runs every network — the Real-ESRGAN upscaler *and*
+  the face-restoration nets (GFPGAN v1.4, CodeFormer) — from their original
+  `.pth` weights through one interface. Swapping in SwinIR/HAT/DAT later is a
+  weight-registry change, not new inference code.
+- **`facexlib`** handles face detection, alignment, and paste-back (the same
+  components GFPGAN uses internally), and installs cleanly with no `basicsr`.
+
+The result is a modern, buildable stack on current Python and torchvision.
 
 ## License
 

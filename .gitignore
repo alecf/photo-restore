@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+
+# uv
+.uv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Model weights (downloaded on first use, never committed)
+*.pth
+*.safetensors
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local env overrides
+.env
+.env.local

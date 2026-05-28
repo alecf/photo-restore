@@ -19,31 +19,28 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: Graphics Conversion",
 ]
 
-# Core deps are intentionally light so the CLI, resolution math, and tests run
-# without the multi-gigabyte ML stack. The models live in the `ml` extra.
+# Running the restoration models is the entire point of the tool, so the ML
+# stack is a core dependency. We deliberately do NOT depend on the
+# `gfpgan`/`realesrgan` packages: both drag in `basicsr`, which fails to build on
+# modern Python (3.12+). Instead spandrel runs every network (the upscaler and
+# the face-restoration nets alike) and facexlib handles face detection /
+# alignment / paste-back — the same pieces gfpgan uses internally, minus the
+# unbuildable dependency.
 dependencies = [
     "pillow>=10.4",
     "numpy>=1.26",
     "typer>=0.12",
-]
-
-[project.optional-dependencies]
-# Everything needed to actually run the restoration models. We deliberately do
-# NOT depend on the `gfpgan`/`realesrgan` packages: both drag in `basicsr`, which
-# fails to build on modern Python (3.12+). Instead spandrel runs every network
-# (the upscaler and the face-restoration nets alike) and facexlib handles face
-# detection / alignment / paste-back — the same pieces gfpgan uses internally,
-# minus the unbuildable dependency.
-ml = [
     "torch>=2.2",
     "torchvision>=0.17",
     "spandrel>=0.4",
     "facexlib>=0.3",
     "opencv-python>=4.9",
 ]
-# CodeFormer (`--strength balanced`) lives in spandrel_extra_arches, which is
-# kept separate because CodeFormer ships under a non-commercial license. The
-# permissively licensed conservative default does not need this.
+
+[project.optional-dependencies]
+# CodeFormer (`--strength balanced`) lives in spandrel_extra_arches, kept as an
+# opt-in extra because CodeFormer ships under a non-commercial license. The
+# permissively licensed conservative default does not need it.
 balanced = [
     "spandrel-extra-arches>=0.2",
 ]

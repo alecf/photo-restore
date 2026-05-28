@@ -246,8 +246,8 @@ def main(
                 "stdout (e.g. `restore-photos in.jpg > out.png`)."
             )
 
-    # Resolve the compute device only if a stage will actually run on it, so a
-    # contrast-only / downscale-only run works without the ML stack installed.
+    # Resolve the compute device only if a stage will actually run on it, so
+    # --dry-run and contrast/downscale-only runs skip torch's slow import.
     device_str = "cpu"
     if not dry_run and (not no_face or _may_enlarge(target)):
         try:

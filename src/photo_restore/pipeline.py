@@ -1,8 +1,8 @@
 """Orchestrates the four restoration stages for a single image.
 
 Stage order: contrast -> faces -> upscale -> fit-to-target. Each is skippable.
-The ML stages are only imported when actually used, so a contrast-only or
-resize-only run needs no torch.
+The ML stages import torch lazily, so --help, --dry-run, and contrast/resize-only
+runs don't pay torch's slow import cost.
 """
 
 from __future__ import annotations

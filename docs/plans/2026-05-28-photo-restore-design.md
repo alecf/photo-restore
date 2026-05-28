@@ -108,9 +108,11 @@ photo-restore/
   tests/                    # pure logic gets real assertions; ML gets smoke tests
 ```
 
-Heavy ML libraries (`torch`, `spandrel`, `facexlib`) are **lazy-imported** inside
-the stages so the CLI, resolution math, and tests run without them installed.
-They live in the `ml` optional-dependency extra.
+The ML stack (`torch`, `spandrel`, `facexlib`, `opencv`) is a **core dependency**
+— running the models is the whole point of the tool. The stages still
+**lazy-import** torch so `--help`, `--dry-run`, and contrast/resize-only runs
+don't pay its slow import cost. Only CodeFormer (`spandrel_extra_arches`) is an
+opt-in extra, because of its non-commercial license.
 
 ## Error handling
 

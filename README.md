@@ -36,22 +36,18 @@ weight.
 git clone https://github.com/alecf/photo-restore
 cd photo-restore
 
-# Create a virtual env and install with the ML extra (the models).
+# Create a virtual env and install. This pulls the ML stack (torch, spandrel,
+# facexlib, opencv) — a few GB — because running the models is the whole point.
 uv venv
-uv pip install -e ".[ml,dev]"
+uv pip install -e .
 
 # Optional: add CodeFormer for `--strength balanced` (non-commercial license).
-uv pip install -e ".[ml,balanced]"
+uv pip install -e ".[balanced]"
 ```
 
-> **Note on the `ml` extra:** it installs `torch`, `torchvision`, `spandrel`,
-> `facexlib`, and `opencv` (a few GB). The base install (`uv pip install -e .`)
-> gives you the CLI, contrast, and resizing without the heavy stack — handy for
-> development.
->
 > **Note on the `balanced` extra:** `--strength balanced` uses CodeFormer, whose
 > architecture ships in `spandrel_extra_arches` under a **non-commercial
-> license**. It is kept in a separate extra so the default (`conservative`,
+> license**. It is the one piece kept opt-in, so the default (`conservative`,
 > GFPGAN + Real-ESRGAN, permissively licensed) carries no such restriction.
 > Without this extra, `--strength balanced` fails with an explanatory message.
 
@@ -125,7 +121,7 @@ restore-photos --download-models   # pre-warm the cache (e.g. before going offli
 ## Development
 
 ```bash
-uv pip install -e ".[dev]"   # light: CLI + pure logic, no torch
+uv pip install -e ".[dev]"   # adds pytest, ruff, mypy on top of the core stack
 uv run pytest                # tests (pure logic + I/O; ML stages are smoke-tested)
 uv run ruff check .
 uv run ruff format --check .
@@ -133,8 +129,8 @@ uv run mypy
 ```
 
 The resolution math, CLI dispatch, grayscale handling, and contrast pass have
-real unit tests and run without the ML stack. The ML stages lazy-import torch,
-so the test suite and a contrast-only/resize-only run work in a base install.
+real unit tests that need no model. The ML stages import torch lazily, so
+`--help`, `--dry-run`, and contrast/resize-only runs start fast.
 
 ## How the models are loaded
 

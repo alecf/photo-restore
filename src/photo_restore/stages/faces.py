@@ -35,14 +35,14 @@ _STRENGTH: dict[str, tuple[str, float | None, bool]] = {
 }
 
 _MISSING_ML = (
-    "Face restoration needs the ML extra. Install it with:\n"
-    '    uv pip install -e ".[ml]"   (or: pip install "photo-restore[ml]")'
+    "PyTorch isn't importable — the install looks incomplete. Reinstall with:\n"
+    "    uv pip install -e .   (or: pip install photo-restore)"
 )
 
 _MISSING_BALANCED = (
     "--strength balanced uses CodeFormer, whose architecture ships in the "
     "separate `balanced` extra (non-commercial license). Install it with:\n"
-    '    uv pip install -e ".[ml,balanced]"\n'
+    '    uv pip install -e ".[balanced]"\n'
     "Or use the permissively licensed default (--strength conservative)."
 )
 

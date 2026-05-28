@@ -14,8 +14,8 @@ import numpy as np
 from photo_restore import models
 
 _MISSING_ML = (
-    "Upscaling needs the ML extra. Install it with:\n"
-    '    uv pip install -e ".[ml]"   (or: pip install "photo-restore[ml]")'
+    "PyTorch isn't importable — the install looks incomplete. Reinstall with:\n"
+    "    uv pip install -e .   (or: pip install photo-restore)"
 )
 
 

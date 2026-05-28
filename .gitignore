@@ -30,3 +30,8 @@ venv/
 # Local env overrides
 .env
 .env.local
+
+# Stray test images / outputs in the repo root (real fixtures live in tests/)
+/*.jpg
+/*.jpeg
+/*.png

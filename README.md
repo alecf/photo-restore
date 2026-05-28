@@ -39,11 +39,21 @@ cd photo-restore
 # Create a virtual env and install with the ML extra (the models).
 uv venv
 uv pip install -e ".[ml,dev]"
+
+# Optional: add CodeFormer for `--strength balanced` (non-commercial license).
+uv pip install -e ".[ml,balanced]"
 ```
 
-> **Note on the `ml` extra:** it installs `torch`, `spandrel`, `gfpgan`, and
-> friends (a few GB). The base install (`uv pip install -e .`) gives you the
-> CLI, contrast, and resizing without the heavy stack — handy for development.
+> **Note on the `ml` extra:** it installs `torch`, `torchvision`, `spandrel`,
+> `facexlib`, and `opencv` (a few GB). The base install (`uv pip install -e .`)
+> gives you the CLI, contrast, and resizing without the heavy stack — handy for
+> development.
+>
+> **Note on the `balanced` extra:** `--strength balanced` uses CodeFormer, whose
+> architecture ships in `spandrel_extra_arches` under a **non-commercial
+> license**. It is kept in a separate extra so the default (`conservative`,
+> GFPGAN + Real-ESRGAN, permissively licensed) carries no such restriction.
+> Without this extra, `--strength balanced` fails with an explanatory message.
 
 Model weights (60–350 MB each) download automatically on first use to
 `~/.cache/photo-restore/`. Pre-download them with:
@@ -94,6 +104,7 @@ factor and then Lanczos-resizes down to your exact target.
 |---|---|---|
 | `-o, --output` | stdout | Output file or directory |
 | `--strength` | `conservative` | `conservative` (GFPGAN) or `balanced` (CodeFormer) |
+| `--fidelity` | `0.8` | CodeFormer fidelity for `balanced`: `1.0` = most faithful to the input face, `0.0` = most freely reconstructed. Keep high for family photos. |
 | `--no-face` | off | Skip face restoration |
 | `--no-contrast` | off | Skip contrast normalization |
 | `--device` | `auto` | `auto` (GPU), `mps`, or `cpu` |
@@ -102,6 +113,7 @@ factor and then Lanczos-resizes down to your exact target.
 | `--overwrite` | off | Reprocess files that already have output |
 | `--no-recurse` | off | Don't descend into subdirectories |
 | `--dry-run` | off | Report what would happen; do nothing |
+| `--debug` | off | Print full tracebacks on per-file errors |
 
 ### Models
 

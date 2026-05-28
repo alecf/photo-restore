@@ -1,13 +1,20 @@
 """Face restoration via spandrel + facexlib.
 
 facexlib detects, aligns, and pastes faces back; spandrel runs the restoration
-network (GFPGAN v1.4 by default, CodeFormer for `--strength balanced`). This
-avoids the `gfpgan`/`basicsr` packages, which don't build on modern Python.
+network. This avoids the `gfpgan`/`basicsr` packages, which don't build on
+modern Python.
 
-If no faces are found the input is returned unchanged. Identity preservation is
-the priority, so the default is GFPGAN v1.4.
+Two strengths:
 
-Heavy ML libraries are imported lazily inside `restore`.
+- 'conservative' (default): GFPGAN v1.4, the most identity-faithful option,
+  permissively licensed (Apache-2.0 / BSD).
+- 'balanced': CodeFormer, run at a high fidelity weight so it stays faithful to
+  the input face while recovering more detail. CodeFormer's architecture lives
+  in `spandrel_extra_arches` (the `balanced` install extra) and ships under a
+  non-commercial license — see README.
+
+If no faces are found the input is returned unchanged. Heavy ML libraries are
+imported lazily inside `restore`.
 """
 
 from __future__ import annotations
@@ -18,10 +25,13 @@ import numpy as np
 
 from photo_restore import models
 
-# strength -> weight registry name
-_STRENGTH = {
-    "conservative": "gfpgan-v1.4",
-    "balanced": "codeformer",
+# strength -> (weight name, default fidelity weight, needs spandrel_extra_arches)
+# A fidelity of None means the network has no fidelity knob (GFPGAN); we then use
+# spandrel's standard call. A float means CodeFormer's `weight` (1.0 = stay
+# faithful to the input, 0.0 = freely reconstruct), injected via the raw model.
+_STRENGTH: dict[str, tuple[str, float | None, bool]] = {
+    "conservative": ("gfpgan-v1.4", None, False),
+    "balanced": ("codeformer", 0.8, True),
 }
 
 _MISSING_ML = (
@@ -29,15 +39,27 @@ _MISSING_ML = (
     '    uv pip install -e ".[ml]"   (or: pip install "photo-restore[ml]")'
 )
 
+_MISSING_BALANCED = (
+    "--strength balanced uses CodeFormer, whose architecture ships in the "
+    "separate `balanced` extra (non-commercial license). Install it with:\n"
+    '    uv pip install -e ".[ml,balanced]"\n'
+    "Or use the permissively licensed default (--strength conservative)."
+)
+
+_extra_arches_registered = False
+
 
 def restore(
-    array: np.ndarray, *, strength: str = "conservative", device: str = "mps"
+    array: np.ndarray,
+    *,
+    strength: str = "conservative",
+    device: str = "mps",
+    fidelity: float | None = None,
 ) -> np.ndarray:
     """Restore faces in an RGB uint8 array. Returns RGB uint8 of the same size.
 
-    `strength` selects the network: 'conservative' (GFPGAN v1.4, identity-faithful)
-    or 'balanced' (CodeFormer — sharper, recovers more from heavy degradation,
-    slightly higher risk of subtle facial change).
+    `fidelity` overrides the default CodeFormer fidelity for 'balanced'; it is
+    ignored for 'conservative' (GFPGAN has no such knob).
     """
     if strength not in _STRENGTH:
         raise ValueError(f"unknown strength {strength!r}; choose from {sorted(_STRENGTH)}")
@@ -49,7 +71,12 @@ def restore(
     except ImportError as err:  # pragma: no cover - exercised only without the ml extra
         raise RuntimeError(_MISSING_ML) from err
 
-    model = _load_model(_STRENGTH[strength], device)
+    weight_name, default_fidelity, needs_extra = _STRENGTH[strength]
+    if needs_extra:
+        _register_extra_arches()
+    fid = default_fidelity if fidelity is None else fidelity
+
+    model = _load_model(weight_name, device)
 
     helper = FaceRestoreHelper(
         upscale_factor=1,
@@ -78,14 +105,15 @@ def restore(
             .to(device)
         )
         with torch.no_grad():
-            out = model(tensor)
+            if fid is None:
+                out = model(tensor)  # spandrel's standard call (GFPGAN)
+            else:
+                # Replicate spandrel's path but inject the fidelity weight. The
+                # crop is already 512x512 square, so spandrel's pad step is a
+                # no-op; the only difference is `weight=fid` instead of 0.5.
+                out = model.model(tensor, weight=fid)[0].clamp(0.0, 1.0)
         restored_rgb = (
-            out.clamp(0.0, 1.0)
-            .mul(255.0)
-            .round()
-            .squeeze(0)
-            .permute(1, 2, 0)
-            .to("cpu", torch.uint8)
+            out.mul(255.0).round().squeeze(0).permute(1, 2, 0).to("cpu", torch.uint8)
         ).numpy()
         helper.add_restored_face(cv2.cvtColor(restored_rgb, cv2.COLOR_RGB2BGR))
 
@@ -93,6 +121,19 @@ def restore(
     pasted_bgr = helper.paste_faces_to_input_image()
     result: np.ndarray = cv2.cvtColor(pasted_bgr, cv2.COLOR_BGR2RGB)
     return result
+
+
+def _register_extra_arches() -> None:
+    global _extra_arches_registered
+    if _extra_arches_registered:
+        return
+    try:
+        from spandrel import MAIN_REGISTRY
+        from spandrel_extra_arches import EXTRA_REGISTRY
+    except ImportError as err:
+        raise RuntimeError(_MISSING_BALANCED) from err
+    MAIN_REGISTRY.add(*EXTRA_REGISTRY)
+    _extra_arches_registered = True
 
 
 @lru_cache(maxsize=2)

@@ -21,6 +21,7 @@ from photo_restore.stages import contrast
 class Config:
     target: Target
     strength: str = "conservative"
+    fidelity: float | None = None  # CodeFormer fidelity for strength="balanced"
     do_face: bool = True
     do_contrast: bool = True
     device: str = "mps"
@@ -43,7 +44,12 @@ def restore_image(loaded: LoadedImage, config: Config) -> Image.Image:
     if config.do_face:
         from photo_restore.stages import faces
 
-        array = faces.restore(array, strength=config.strength, device=config.device)
+        array = faces.restore(
+            array,
+            strength=config.strength,
+            device=config.device,
+            fidelity=config.fidelity,
+        )
 
     if resolution.needs_enlargement(orig_w, orig_h, target_w, target_h):
         from photo_restore.stages import upscale

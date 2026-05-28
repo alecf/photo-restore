@@ -41,6 +41,12 @@ ml = [
     "facexlib>=0.3",
     "opencv-python>=4.9",
 ]
+# CodeFormer (`--strength balanced`) lives in spandrel_extra_arches, which is
+# kept separate because CodeFormer ships under a non-commercial license. The
+# permissively licensed conservative default does not need this.
+balanced = [
+    "spandrel-extra-arches>=0.2",
+]
 dev = [
     "pytest>=8",
     "ruff>=0.6",

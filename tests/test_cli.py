@@ -71,6 +71,19 @@ def test_tty_refusal(monkeypatch, color_image: Path):
     assert "terminal" in result.output
 
 
+def test_error_message_names_exception_type(tmp_path: Path):
+    # A failing file must report *what* went wrong. Some exceptions (e.g.
+    # spandrel's UnsupportedModelError) have an empty str(), so the handler must
+    # include the exception type name, not just its message.
+    bad = tmp_path / "bad.png"
+    bad.write_bytes(b"this is not a real png")
+    out = tmp_path / "out.png"
+    result = runner.invoke(app, [str(bad), "-o", str(out), "--no-face", "--scale", "same"])
+    assert result.exit_code == 1
+    assert "error:" in result.output
+    assert "UnidentifiedImageError" in result.output
+
+
 def test_directory_batch_contrast_only(tmp_path: Path):
     in_dir = tmp_path / "in"
     in_dir.mkdir()

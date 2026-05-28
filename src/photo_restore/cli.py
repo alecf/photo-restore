@@ -9,6 +9,7 @@ resumable (existing outputs are skipped unless --overwrite).
 """
 
 import sys
+import traceback
 from pathlib import Path
 from typing import Annotated
 
@@ -85,6 +86,7 @@ def _run_single(
     quality: int,
     overwrite: bool,
     dry_run: bool,
+    debug: bool = False,
 ) -> bool:
     if out_path is not None and out_path.exists() and not overwrite:
         _eprint(f"skip (exists): {out_path}")
@@ -101,7 +103,13 @@ def _run_single(
             _eprint(f"restored {in_path} -> {out_path}")
         return True
     except Exception as err:
-        _eprint(f"error: {in_path}: {err}")
+        # Always name the exception type: some errors (e.g. spandrel's
+        # UnsupportedModelError) have an empty message, which would otherwise
+        # print as "error: <path>:" with nothing useful after it.
+        detail = f"{type(err).__name__}: {err}" if str(err) else type(err).__name__
+        _eprint(f"error: {in_path}: {detail}")
+        if debug:
+            traceback.print_exc()
         return False
 
 
@@ -115,6 +123,7 @@ def _run_directory(
     overwrite: bool,
     recurse: bool,
     dry_run: bool,
+    debug: bool = False,
 ) -> bool:
     files = imageio.iter_images(in_dir, recurse=recurse)
     if not files:
@@ -134,6 +143,7 @@ def _run_directory(
             quality=quality,
             overwrite=overwrite,
             dry_run=dry_run,
+            debug=debug,
         )
         all_ok = all_ok and ok
     return all_ok
@@ -161,6 +171,14 @@ def main(
         str,
         typer.Option("--strength", help="Face model: 'conservative' or 'balanced'."),
     ] = "conservative",
+    fidelity: Annotated[
+        float | None,
+        typer.Option(
+            "--fidelity",
+            help="CodeFormer fidelity for --strength balanced: 1.0=most faithful, "
+            "0.0=most invented. Default 0.8.",
+        ),
+    ] = None,
     no_face: Annotated[bool, typer.Option("--no-face", help="Skip face restoration.")] = False,
     no_contrast: Annotated[
         bool, typer.Option("--no-contrast", help="Skip contrast normalization.")
@@ -180,6 +198,9 @@ def main(
     ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Report what would happen; do no work.")
+    ] = False,
+    debug: Annotated[
+        bool, typer.Option("--debug", help="Print full tracebacks on per-file errors.")
     ] = False,
     list_models: Annotated[
         bool, typer.Option("--list-models", help="List models and cache status, then exit.")
@@ -203,6 +224,8 @@ def main(
 
     target = _resolve_target(scale, size)
     fmt_norm = _normalize_format(fmt)
+    if fidelity is not None and not (0.0 <= fidelity <= 1.0):
+        raise typer.BadParameter("--fidelity must be between 0.0 and 1.0")
 
     # Validate the input/output arrangement *before* touching the device, so the
     # clean "directory needs -o" / TTY-refusal errors fire even in a base install
@@ -235,6 +258,7 @@ def main(
     config = Config(
         target=target,
         strength=strength,
+        fidelity=fidelity,
         do_face=not no_face,
         do_contrast=not no_contrast,
         device=device_str,
@@ -251,6 +275,7 @@ def main(
             overwrite=overwrite,
             recurse=not no_recurse,
             dry_run=dry_run,
+            debug=debug,
         )
     else:
         ok = _run_single(
@@ -261,6 +286,7 @@ def main(
             quality=quality,
             overwrite=overwrite,
             dry_run=dry_run,
+            debug=debug,
         )
     raise typer.Exit(0 if ok else 1)
 

@@ -13,8 +13,8 @@ toward a native Mac app later.
 | Stage | What | Model |
 |---|---|---|
 | Contrast | Auto levels/contrast on faded scans (hue-preserving) | classical, no ML |
-| Faces | Detect → restore → paste back; no-op if no faces | GFPGAN v1.4 (default) |
-| Upscale | Super-resolution on the whole image | Real-ESRGAN x4plus (via `spandrel`) |
+| Upscale | Super-resolution to build the target-size background | Real-ESRGAN x4plus (via `spandrel`) |
+| Faces | Detect → restore → composite onto the upscaled background | GFPGAN v1.4 (default) |
 | Fit | Lanczos resize to your exact target, aspect ratio preserved | Pillow |
 
 The defaults are tuned to **preserve identity**. The newer diffusion restorers
@@ -22,6 +22,15 @@ The defaults are tuned to **preserve identity**. The newer diffusion restorers
 deliberately not used here. For sharper recovery on heavily degraded photos,
 `--strength balanced` switches the face model to CodeFormer at a high fidelity
 weight.
+
+**Keeping faces from looking "photoshopped."** Face restorers *regenerate* the
+face from a learned prior, so on already-sharp inputs they can look smoother than
+the rest of the photo. Three defaults counter this: restored faces are
+composited onto the upscaled background (they never pass through the upscaler, so
+textures match); the result is blended back over the original (`--face-blend`) to
+keep real skin texture; matched film grain is added (`--face-grain`); and faces
+already large in the source are left alone (`--face-restore-threshold`). Tune
+these per photo.
 
 ## Requirements
 
@@ -101,6 +110,9 @@ factor and then Lanczos-resizes down to your exact target.
 | `-o, --output` | stdout | Output file or directory |
 | `--strength` | `conservative` | `conservative` (GFPGAN) or `balanced` (CodeFormer) |
 | `--fidelity` | `0.8` | CodeFormer fidelity for `balanced`: `1.0` = most faithful to the input face, `0.0` = most freely reconstructed. Keep high for family photos. |
+| `--face-blend` | `0.8` | Blend of the restored face over the original: `1.0` = fully restored, `0.0` = original. Lower keeps more real skin texture (less "photoshopped"). |
+| `--face-restore-threshold` | `500` | Skip regenerating faces already larger than this many **source** pixels — they look synthetic when regenerated, so they're left to the background upscaler. `0` restores every face. |
+| `--face-grain` / `--no-face-grain` | on | Add film grain matched to the source so the restored face reads as the same scan. |
 | `--no-face` | off | Skip face restoration |
 | `--no-contrast` | off | Skip contrast normalization |
 | `--device` | `auto` | `auto` (GPU), `mps`, or `cpu` |

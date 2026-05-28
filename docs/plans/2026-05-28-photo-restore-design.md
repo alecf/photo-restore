@@ -26,16 +26,20 @@ Each photo flows through up to four stages, each individually skippable:
 1. **Pre-process (classical, no ML):** auto-contrast / levels normalization and
    light denoise (Pillow + NumPy). Often the single biggest visible win on faded
    scans, and nearly free.
-2. **Face restoration (GFPGAN v1.4):** detects faces, restores each, pastes back.
-   No faces found → no-op. Chosen as the most identity-faithful option; the more
-   aggressive CodeFormer (`w` fidelity weight) is available as `--strength
-   balanced`.
-3. **Upscale (Real-ESRGAN x4plus via `spandrel`):** runs on the whole image.
-   Loaded through spandrel so SwinIR / HAT / DAT can be swapped in later without
-   touching orchestration. Only runs when the target needs enlargement.
-4. **Fit to target (Lanczos):** ML models emit fixed integer scales (4×). We
-   upscale at the native factor, then Lanczos-resize to the exact target,
-   always preserving aspect ratio.
+2. **Build the background:** upscale the whole image (Real-ESRGAN x4plus via
+   `spandrel`, only when enlarging) and Lanczos-resize to the exact target.
+   spandrel lets SwinIR / HAT / DAT swap in later without touching orchestration.
+3. **Face restoration + compositing (GFPGAN v1.4):** detect faces on the source,
+   restore each 512 crop, and **composite onto the upscaled background** — the
+   face never passes through the upscaler, so its texture doesn't diverge.
+   CodeFormer (high `w` fidelity) is available as `--strength balanced`.
+
+Because face restorers *regenerate* the face from a learned prior, three knobs
+fight the resulting "photoshopped" look: **size gating**
+(`--face-restore-threshold`, skip faces already large in the source), **blend**
+(`--face-blend`, mix the restored face back over the original to keep real skin
+texture), and **grain match** (`--face-grain`, add film grain matched to the
+source crop). Each stage is individually skippable.
 
 All ML runs on MPS with `PYTORCH_ENABLE_MPS_FALLBACK=1` so any unimplemented op
 falls back per-op to CPU instead of crashing.

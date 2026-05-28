@@ -32,6 +32,11 @@ venv/
 .env.local
 
 # Stray test images / outputs in the repo root (real fixtures live in tests/)
-/*.jpg
-/*.jpeg
-/*.png
+
+# Never commit photos anywhere in the tree (privacy) or local work dirs.
+*.jpg
+*.jpeg
+*.png
+inputs/
+outputs/
+outputs-balanced/

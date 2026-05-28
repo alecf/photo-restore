@@ -179,6 +179,29 @@ def main(
             "0.0=most invented. Default 0.8.",
         ),
     ] = None,
+    face_blend: Annotated[
+        float,
+        typer.Option(
+            "--face-blend",
+            help="Blend of restored face over the original: 1.0=fully restored, "
+            "0.0=original. Lower keeps more real skin texture. Default 0.8.",
+        ),
+    ] = 0.8,
+    face_restore_threshold: Annotated[
+        int,
+        typer.Option(
+            "--face-restore-threshold",
+            help="Skip restoring faces already larger than this many source pixels "
+            "(they regenerate as too-smooth). 0 restores every face. Default 500.",
+        ),
+    ] = 500,
+    face_grain: Annotated[
+        bool,
+        typer.Option(
+            "--face-grain/--no-face-grain",
+            help="Match film grain so the restored face reads as the same scan.",
+        ),
+    ] = True,
     no_face: Annotated[bool, typer.Option("--no-face", help="Skip face restoration.")] = False,
     no_contrast: Annotated[
         bool, typer.Option("--no-contrast", help="Skip contrast normalization.")
@@ -226,6 +249,10 @@ def main(
     fmt_norm = _normalize_format(fmt)
     if fidelity is not None and not (0.0 <= fidelity <= 1.0):
         raise typer.BadParameter("--fidelity must be between 0.0 and 1.0")
+    if not (0.0 <= face_blend <= 1.0):
+        raise typer.BadParameter("--face-blend must be between 0.0 and 1.0")
+    if face_restore_threshold < 0:
+        raise typer.BadParameter("--face-restore-threshold must be >= 0")
 
     # Validate the input/output arrangement *before* touching the device, so the
     # clean "directory needs -o" / TTY-refusal errors fire even in a base install
@@ -261,6 +288,9 @@ def main(
         fidelity=fidelity,
         do_face=not no_face,
         do_contrast=not no_contrast,
+        face_blend=face_blend,
+        face_restore_threshold=face_restore_threshold,
+        face_grain=face_grain,
         device=device_str,
     )
 

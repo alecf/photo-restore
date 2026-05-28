@@ -68,6 +68,25 @@ def _blend(restored: np.ndarray, original: np.ndarray, alpha: float) -> np.ndarr
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
+def _match_color(restored: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Give the restored face the *color* of the reference (source) crop while
+    keeping its own brightness/detail.
+
+    These nets are trained on color faces and inject blue-ish eyes / reddish lips
+    even into B&W or sepia inputs. Taking luma from the restored face and
+    chroma from the source neutralizes that: grayscale stays gray, sepia stays
+    sepia, real color stays the source's real color.
+    """
+    import cv2
+
+    out = cv2.cvtColor(restored, cv2.COLOR_RGB2YCrCb)
+    ref = cv2.cvtColor(reference, cv2.COLOR_RGB2YCrCb)
+    out[:, :, 1] = ref[:, :, 1]  # Cr
+    out[:, :, 2] = ref[:, :, 2]  # Cb
+    result: np.ndarray = cv2.cvtColor(out, cv2.COLOR_YCrCb2RGB)
+    return result
+
+
 def _match_grain(
     face: np.ndarray,
     reference: np.ndarray,
@@ -104,6 +123,7 @@ def restore_onto(
     blend: float = 0.8,
     restore_threshold: int = 500,
     grain: bool = True,
+    match_color: bool = True,
 ) -> np.ndarray:
     """Detect faces in `array` (native res), restore them, and composite onto
     `background` (an RGB uint8 image already upscaled to the target size).
@@ -172,6 +192,8 @@ def restore_onto(
             out.mul(255.0).round().squeeze(0).permute(1, 2, 0).to("cpu", torch.uint8)
         ).numpy()
 
+        if match_color:
+            restored_rgb = _match_color(restored_rgb, crop_rgb)
         restored_rgb = _blend(restored_rgb, crop_rgb, blend)
         if grain:
             restored_rgb = _match_grain(restored_rgb, crop_rgb, rng=rng)

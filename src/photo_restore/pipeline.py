@@ -31,6 +31,7 @@ class Config:
     face_blend: float = 0.8  # 1.0 = fully restored face, 0.0 = original
     face_restore_threshold: int = 500  # skip faces larger than this (px); 0 = restore all
     face_grain: bool = True  # match film grain so the face reads as the same scan
+    match_face_color: bool = True  # take face color from the source (no invented blue eyes)
     device: str = "mps"
     upscaler: str = "realesrgan-x4plus"
 
@@ -63,6 +64,7 @@ def restore_image(loaded: LoadedImage, config: Config) -> Image.Image:
             blend=config.face_blend,
             restore_threshold=config.face_restore_threshold,
             grain=config.face_grain,
+            match_color=config.match_face_color,
         )
     else:
         result = background

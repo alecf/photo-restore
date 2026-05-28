@@ -202,6 +202,14 @@ def main(
             help="Match film grain so the restored face reads as the same scan.",
         ),
     ] = True,
+    match_face_color: Annotated[
+        bool,
+        typer.Option(
+            "--match-face-color/--no-match-face-color",
+            help="Recolor the restored face to the source (B&W stays gray, sepia "
+            "stays sepia) instead of the model's invented blue eyes / red lips.",
+        ),
+    ] = True,
     no_face: Annotated[bool, typer.Option("--no-face", help="Skip face restoration.")] = False,
     no_contrast: Annotated[
         bool, typer.Option("--no-contrast", help="Skip contrast normalization.")
@@ -291,6 +299,7 @@ def main(
         face_blend=face_blend,
         face_restore_threshold=face_restore_threshold,
         face_grain=face_grain,
+        match_face_color=match_face_color,
         device=device_str,
     )
 

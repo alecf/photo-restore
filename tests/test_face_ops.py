@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from photo_restore.stages.faces import _blend, _match_grain, _should_restore
+from photo_restore.stages.faces import _blend, _match_color, _match_grain, _should_restore
 
 
 class TestShouldRestore:
@@ -41,6 +41,52 @@ class TestBlend:
         restored = np.full((2, 2, 3), 200, np.uint8)
         original = np.full((2, 2, 3), 50, np.uint8)
         assert np.array_equal(_blend(restored, original, 5.0), restored)
+
+
+class TestMatchColor:
+    def test_grayscale_reference_neutralizes_face(self):
+        # A face with invented color, recolored from a neutral-gray reference,
+        # should come out grayscale (R == G == B).
+        restored = np.zeros((16, 16, 3), np.uint8)
+        restored[..., 0] = 60  # reddish lips / bluish eyes vibe
+        restored[..., 2] = 180
+        gray = np.full((16, 16, 3), 120, np.uint8)
+        out = _match_color(restored, gray)
+        assert np.allclose(out[..., 0], out[..., 1], atol=2)
+        assert np.allclose(out[..., 1], out[..., 2], atol=2)
+
+    def test_takes_chroma_from_reference(self):
+        # Output chroma should match the reference's chroma, not the restored's.
+        import cv2
+
+        restored = np.full((16, 16, 3), 0, np.uint8)
+        restored[..., 2] = 200  # very blue
+        sepia = np.dstack(
+            [
+                np.full((16, 16), 150, np.uint8),
+                np.full((16, 16), 120, np.uint8),
+                np.full((16, 16), 80, np.uint8),
+            ]
+        )
+        out = _match_color(restored, sepia)
+        out_cr = cv2.cvtColor(out, cv2.COLOR_RGB2YCrCb)[..., 1]
+        ref_cr = cv2.cvtColor(sepia, cv2.COLOR_RGB2YCrCb)[..., 1]
+        assert np.allclose(out_cr, ref_cr, atol=2)
+
+    def test_preserves_restored_luma(self):
+        # Luma is preserved when the reference chroma is mild (as real B&W/sepia
+        # scans are); extreme chroma can push RGB out of gamut and clip, which is
+        # not a realistic input here.
+        import cv2
+
+        rng = np.random.default_rng(0)
+        restored = rng.integers(0, 255, (16, 16, 3), dtype=np.uint8)
+        sepia_luma = rng.integers(40, 210, (16, 16), dtype=np.uint8)
+        reference = np.dstack([sepia_luma, sepia_luma, (sepia_luma * 0.8).astype(np.uint8)])
+        out = _match_color(restored, reference)
+        out_y = cv2.cvtColor(out, cv2.COLOR_RGB2YCrCb)[..., 0]
+        in_y = cv2.cvtColor(restored, cv2.COLOR_RGB2YCrCb)[..., 0]
+        assert np.allclose(out_y, in_y, atol=3)
 
 
 class TestMatchGrain:

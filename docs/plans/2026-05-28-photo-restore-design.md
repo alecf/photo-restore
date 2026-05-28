@@ -39,7 +39,10 @@ fight the resulting "photoshopped" look: **size gating**
 (`--face-restore-threshold`, skip faces already large in the source), **blend**
 (`--face-blend`, mix the restored face back over the original to keep real skin
 texture), and **grain match** (`--face-grain`, add film grain matched to the
-source crop). Each stage is individually skippable.
+source crop). A fourth knob, **color match** (`--match-face-color`, default on),
+gives the restored face the source crop's chroma while keeping the model's luma
+— so B&W stays gray and sepia stays sepia instead of gaining the prior's
+invented blue eyes / red lips. Each stage is individually skippable.
 
 All ML runs on MPS with `PYTORCH_ENABLE_MPS_FALLBACK=1` so any unimplemented op
 falls back per-op to CPU instead of crashing.

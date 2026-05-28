@@ -32,6 +32,12 @@ keep real skin texture; matched film grain is added (`--face-grain`); and faces
 already large in the source are left alone (`--face-restore-threshold`). Tune
 these per photo.
 
+Because these nets are trained on color faces, they paint blue-ish eyes and
+reddish lips even onto black-and-white or sepia scans. By default
+(`--match-face-color`) the restored face takes its *color* from the source crop
+while keeping the model's recovered detail — so B&W stays gray, sepia stays
+sepia, and color photos keep their own (not invented) tones.
+
 ## Requirements
 
 - macOS on Apple Silicon (M1/M2/M3…). Runs on the GPU via PyTorch **MPS** by
@@ -113,6 +119,7 @@ factor and then Lanczos-resizes down to your exact target.
 | `--face-blend` | `0.8` | Blend of the restored face over the original: `1.0` = fully restored, `0.0` = original. Lower keeps more real skin texture (less "photoshopped"). |
 | `--face-restore-threshold` | `500` | Skip regenerating faces already larger than this many **source** pixels — they look synthetic when regenerated, so they're left to the background upscaler. `0` restores every face. |
 | `--face-grain` / `--no-face-grain` | on | Add film grain matched to the source so the restored face reads as the same scan. |
+| `--match-face-color` / `--no-match-face-color` | on | Recolor the restored face to the source's color (B&W stays gray, sepia stays sepia) instead of the model's invented blue eyes / red lips. |
 | `--no-face` | off | Skip face restoration |
 | `--no-contrast` | off | Skip contrast normalization |
 | `--device` | `auto` | `auto` (GPU), `mps`, or `cpu` |

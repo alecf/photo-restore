@@ -22,6 +22,7 @@ extra, non-commercial license). Heavy ML libraries are imported lazily.
 
 from __future__ import annotations
 
+import warnings
 from functools import lru_cache
 
 import numpy as np
@@ -149,15 +150,22 @@ def restore_onto(
 
     model = _load_model(weight_name, device)
 
-    helper = FaceRestoreHelper(
-        upscale_factor=scale_ratio,
-        face_size=512,
-        crop_ratio=(1, 1),
-        det_model="retinaface_resnet50",
-        save_ext="png",
-        use_parse=True,
-        device=device,
-    )
+    # facexlib initializes its detector with torchvision's deprecated
+    # `pretrained=` API, which spams two UserWarnings on every call. Silence just
+    # those (matched by message) while the helper spins up.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", category=UserWarning, message=r".*deprecated since 0\.13.*"
+        )
+        helper = FaceRestoreHelper(
+            upscale_factor=scale_ratio,
+            face_size=512,
+            crop_ratio=(1, 1),
+            det_model="retinaface_resnet50",
+            save_ext="png",
+            use_parse=True,
+            device=device,
+        )
     helper.clean_all()
     helper.read_image(cv2.cvtColor(array, cv2.COLOR_RGB2BGR))
     if helper.get_face_landmarks_5(only_center_face=False, eye_dist_threshold=5) == 0:
